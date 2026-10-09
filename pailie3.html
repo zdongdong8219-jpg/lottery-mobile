@@ -17986,18 +17986,41 @@ function renderPositionCopies(id,levels){
 }
 
 let cloudLoading = false;
+async function readCloudState() {
+  for (let attempt=0;attempt<2;attempt++) {
+    const controller=new AbortController();
+    let timer;
+    try {
+      const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{
+        reject(Error('云端读取超时'));
+        controller.abort();
+      },15000);});
+      const request=(async()=>{
+        const response=await fetch('./model-state.json?t='+Date.now(), {cache:'no-store',signal:controller.signal});
+        if(!response.ok)throw Error('云端读取失败 HTTP '+response.status);
+        return await response.json();
+      })();
+      return await Promise.race([request,timeout]);
+    } catch(error) {
+      if(attempt===1)throw error;
+      await new Promise(resolve=>setTimeout(resolve,1000));
+    } finally { clearTimeout(timer); }
+  }
+}
 let cloudRevision = '';
 let cloudAutomaticReplay = null;
 async function syncCloudModel(manual = false) {
   if (cloudLoading || busy || (lastRun?.replay && lastRun !== cloudAutomaticReplay && !manual)) return;
   cloudLoading = true;
   const status = document.getElementById('expertNineStatus');
+  if(status)status.textContent='正在同步云端；当前显示内容尚未确认更新';
   try {
-    const response = await fetch('./model-state.json?t='+Date.now(), {cache:'no-store'});
-    if (!response.ok) throw Error('云端读取失败 HTTP '+response.status);
-    const data = await response.json();
+    const data = await readCloudState();
     if (!data.checkedAt || !data.games?.[SINGLE_KILL_LOTTERY]) throw Error('等待云端首次抓取');
-    if (!manual && data.checkedAt === cloudRevision) return;
+    if (!manual && data.checkedAt === cloudRevision) {
+      if(status)status.textContent='云端记录未变化：'+new Date(data.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
+      return;
+    }
     Object.assign(EXPERT_NINE_SNAPSHOT, data);
     renderBackupNine();
     const g = data.games[SINGLE_KILL_LOTTERY];
@@ -18030,7 +18053,7 @@ async function syncCloudModel(manual = false) {
     renderBackupNine();
     if(status)status.textContent='云端检查：'+new Date(data.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})+' · '+(g.issue||'期号待核实')+' · '+(g.status==='ready'?'已更新':g.error||'专家号码尚未全部公开');
   } catch(error) {
-    if(status)status.textContent=error.message+'；未确认自动更新成功';
+    if(status)status.textContent=error.message+'；本次同步失败，当前内容不是已确认的最新结果。页面可见时每分钟重试，也可点击刷新。';
   } finally { cloudLoading=false; }
 }
 els.btnRefreshExperts.removeEventListener('click',runModel);
@@ -18038,6 +18061,7 @@ els.btnRefreshExperts.addEventListener('click',()=>syncCloudModel(true));
 syncCloudModel();
 setInterval(()=>{if(!document.hidden)syncCloudModel();},60000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncCloudModel();});
+
 
     setupTabs();
 renderBackupNine();
