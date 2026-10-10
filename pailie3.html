@@ -797,6 +797,9 @@
     .position-copy-item textarea { display:block; box-sizing:border-box; width:100%; min-height:112px; resize:none; font:14px/1.8 monospace; letter-spacing:0; padding:8px; color:inherit; background:transparent; border:0; }
     .position-copy-item button { min-height:44px; margin:4px 8px 0 0; }
     .position-copy-item [role="status"] { font-size:12px; }
+    .overall-copy-button { display:block; min-height:44px; max-width:100%; margin-top:8px; padding:6px 10px; }
+    .overall-copy-status { display:block; min-height:18px; font-size:12px; overflow-wrap:anywhere; }
+    .overall-copy-fallback { box-sizing:border-box; width:100%; min-height:72px; font:14px/1.5 monospace; margin-top:6px; }
     @media(max-width:600px) { .position-copies {grid-template-columns:minmax(0,1fr);} }
   </style>
 </head>
@@ -4427,6 +4430,7 @@ return require('./overall-production-engine.cjs').create(base,{"version":"plan-a
         els.appendDate.value = localDateString();
       }
       els.fixedOverallPools.innerHTML = overallPools ? renderOverallSourcePools(overallPools) : renderFixedPoolTable(overall);
+      addOverallCopyButtons(els.fixedOverallPools);
       renderExpertNineState();
       els.fixedPositionPools.innerHTML = positions.map(([label, ranked], position) => `
         <div class="output-section">
@@ -4454,6 +4458,7 @@ return require('./overall-production-engine.cjs').create(base,{"version":"plan-a
       `).join("");
 
       els.overallPools.innerHTML = renderPoolCards(currentOverallRanks());
+      addOverallCopyButtons(els.overallPools);
       const positionLabels = ["百位", "十位", "个位"];
       els.positionPools.innerHTML = positionLabels.map((label, position) => `
         <div class="pool-section">
@@ -4701,6 +4706,33 @@ function renderPositionCopies(id,levels){
     field.focus();field.select();field.setSelectionRange(0,field.value.length);
     try{copied=document.execCommand('copy');}catch{}
    }
+   status.textContent=copied?'已复制':'请长按文字复制';
+  });
+ });
+}
+
+function addOverallCopyButtons(root){
+ root.querySelectorAll('.output-cell, .pool-card').forEach(item=>{
+  if(item.querySelector('.overall-copy-button'))return;
+  const size=Number(item.querySelector('strong, .pool-label')?.textContent.match(/^([5-8])码/)?.[1]);
+  if(!size)return;
+  const digits=(item.querySelector('.output-code, .pool-digits')?.textContent.match(/\d/g)||[]).map(Number).sort((a,b)=>a-b);
+  const ready=digits.length===size&&new Set(digits).size===size;
+  const button=document.createElement('button'),status=document.createElement('span');
+  button.type='button';button.className='btn overall-copy-button';button.textContent='复制'+size+'码';button.disabled=!ready;
+  button.setAttribute('aria-label','复制'+size+'码综合池');status.className='overall-copy-status';status.setAttribute('role','status');
+  item.append(button,status);
+  button.addEventListener('click',async()=>{
+   if(button.disabled)return;
+   const text=(SINGLE_KILL_LOTTERY==='fc3d'?'福彩3D':'排列三')+' 综合池 '+size+'码\n'+digits.join(' ');
+   let copied=false,field;
+   try{await navigator.clipboard.writeText(text);copied=true;}catch{
+    field=item.querySelector('.overall-copy-fallback')||document.createElement('textarea');
+    field.className='overall-copy-fallback';field.readOnly=true;field.value=text;field.setAttribute('aria-label','综合池复制内容');item.append(field);
+    field.focus();field.select();field.setSelectionRange(0,text.length);
+    try{copied=document.execCommand('copy');}catch{}
+   }
+   if(copied){field?.remove();button.focus();}
    status.textContent=copied?'已复制':'请长按文字复制';
   });
  });
