@@ -4706,6 +4706,32 @@ function renderPositionCopies(id,levels){
  });
 }
 
+async function readFastState(options={},fetcher=fetch,timeoutMs=5000){
+  const urls=[
+    'https://raw.githubusercontent.com/zdongdong8219-jpg/lottery-mobile/main/model-state.json',
+    './model-state.json'
+  ];
+  const tasks=urls.map(async url=>{
+    const controller=new AbortController();let timer;
+    const abort=()=>controller.abort();
+    options.signal?.addEventListener('abort',abort,{once:true});
+    if(options.signal?.aborted)controller.abort();
+    try{
+      const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{reject(Error('Data source timeout'));controller.abort();},timeoutMs);});
+      return await Promise.race([timeout,(async()=>{
+        const r=await fetcher(url+'?t='+Date.now(),{cache:'no-store',signal:controller.signal});
+        if(!r.ok)throw Error('HTTP '+r.status);
+        const data=await r.json(),at=Date.parse(data.checkedAt);
+        if(!Number.isFinite(at)||at>Date.now()+300000||!data.games?.fc3d||!data.games?.pailie3||!/^\d{4}-\d{2}-\d{2}$/.test(data.date||''))throw Error('Invalid cloud state');
+        return {data,at};
+      })()]);
+    }finally{clearTimeout(timer);options.signal?.removeEventListener('abort',abort);}
+  });
+  const results=await Promise.allSettled(tasks);
+  const valid=results.filter(r=>r.status==='fulfilled').map(r=>r.value).sort((a,b)=>b.at-a.at);
+  if(!valid.length)throw Error('云端两条数据通道均不可用，请稍后刷新');
+  return {ok:true,json:async()=>valid[0].data};
+}
 let cloudLoading = false;
 async function readCloudState() {
   for (let attempt=0;attempt<2;attempt++) {
@@ -4717,7 +4743,7 @@ async function readCloudState() {
         controller.abort();
       },15000);});
       const request=(async()=>{
-        const response=await fetch('./model-state.json?t='+Date.now(), {cache:'no-store',signal:controller.signal});
+        const response=await readFastState({signal:controller.signal});
         if(!response.ok)throw Error('云端读取失败 HTTP '+response.status);
         return await response.json();
       })();
