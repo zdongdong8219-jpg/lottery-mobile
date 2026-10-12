@@ -4739,28 +4739,43 @@ function addOverallCopyButtons(root){
 }
 
 async function readFastState(options={},fetcher=fetch,timeoutMs=5000){
+  const controllers=[];
+  const valid=[];
+  let firstValid;
+  const first=new Promise(resolve=>{firstValid=resolve;});
   const urls=[
     'https://raw.githubusercontent.com/zdongdong8219-jpg/lottery-mobile/main/model-state.json',
     './model-state.json'
   ];
   const tasks=urls.map(async url=>{
-    const controller=new AbortController();let timer;
+    const controller=new AbortController();controllers.push(controller);let timer;
     const abort=()=>controller.abort();
     options.signal?.addEventListener('abort',abort,{once:true});
     if(options.signal?.aborted)controller.abort();
     try{
-      const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{reject(Error('Data source timeout'));controller.abort();},timeoutMs);});
+      const timeout=new Promise((_,reject)=>{
+        controller.signal.addEventListener('abort',()=>reject(Error('Data request aborted')),{once:true});
+        if(controller.signal.aborted){reject(Error('Data request aborted'));return;}
+        timer=setTimeout(()=>{reject(Error('Data source timeout'));controller.abort();},timeoutMs);
+      });
       return await Promise.race([timeout,(async()=>{
         const r=await fetcher(url+'?t='+Date.now(),{cache:'no-store',signal:controller.signal});
         if(!r.ok)throw Error('HTTP '+r.status);
         const data=await r.json(),at=Date.parse(data.checkedAt);
         if(!Number.isFinite(at)||at>Date.now()+300000||!data.games?.fc3d||!data.games?.pailie3||!/^\d{4}-\d{2}-\d{2}$/.test(data.date||''))throw Error('Invalid cloud state');
-        return {data,at};
+        const minimum=Date.parse(options.minimumAt||'');
+        if(Number.isFinite(minimum)&&at<minimum)throw Error('Cloud state older than displayed revision');
+        const value={data,at};valid.push(value);firstValid();return value;
       })()]);
     }finally{clearTimeout(timer);options.signal?.removeEventListener('abort',abort);}
   });
-  const results=await Promise.allSettled(tasks);
-  const valid=results.filter(r=>r.status==='fulfilled').map(r=>r.value).sort((a,b)=>b.at-a.at);
+  const settled=Promise.allSettled(tasks);
+  await Promise.race([first,settled]);
+  let grace;
+  if(valid.length)await Promise.race([settled,new Promise(resolve=>{grace=setTimeout(resolve,250);})]);
+  clearTimeout(grace);
+  controllers.forEach(controller=>controller.abort());
+  valid.sort((a,b)=>b.at-a.at);
   if(!valid.length)throw Error('云端两条数据通道均不可用，请稍后刷新');
   return {ok:true,json:async()=>valid[0].data};
 }
@@ -4775,7 +4790,7 @@ async function readCloudState() {
         controller.abort();
       },15000);});
       const request=(async()=>{
-        const response=await readFastState({signal:controller.signal});
+        const response=await readFastState({signal:controller.signal,minimumAt:cloudRevision});
         if(!response.ok)throw Error('云端读取失败 HTTP '+response.status);
         return await response.json();
       })();
@@ -4825,7 +4840,8 @@ async function syncCloudModel(manual = false) {
       if(els.replayStatus.textContent==='失败')throw Error(els.replaySummary.textContent);
       cloudAutomaticReplay=lastRun;
     } else {
-      await runModel();
+      const calculated=await runModel();
+      if(calculated!==true)throw Error('本期计算未成功，请核对专家名单、期号或数据状态');
       cloudAutomaticReplay=null;
     }
     cloudRevision = data.checkedAt;
@@ -4838,7 +4854,14 @@ async function syncCloudModel(manual = false) {
 els.btnRefreshExperts.removeEventListener('click',runModel);
 els.btnRefreshExperts.addEventListener('click',()=>syncCloudModel(true));
 syncCloudModel();
-setInterval(()=>{if(!document.hidden)syncCloudModel();},60000);
+let cloudLastPoll=0;
+setInterval(()=>{
+  if(document.hidden)return;
+  const now=Date.now(),beijing=new Date(now+8*3600000);
+  const minute=beijing.getUTCHours()*60+beijing.getUTCMinutes();
+  const interval=minute>=1260&&minute<=1285?15000:60000;
+  if(now-cloudLastPoll>=interval){cloudLastPoll=now;syncCloudModel();}
+},15000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncCloudModel();});
 
 
