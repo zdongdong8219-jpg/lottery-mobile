@@ -5099,6 +5099,42 @@ async function readFastState(options={},fetcher=fetch,timeoutMs=5000){
   if(!valid.length)throw Error('云端两条数据通道均不可用，请稍后刷新');
   return {ok:true,json:async()=>valid[0].data};
 }
+const PREPARED_ENGINE="01ea284ce378e2ccab237c20976ab10e5c48fe10eede067799f7cec37bd23374";
+function validPrepared(p,data,game,engine){
+  const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
+  if(!p||p.engine!==engine||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
+  if(!Array.isArray(p.positions)||p.positions.length!==3||!p.positions.every(a=>Array.isArray(a)&&a.length>=8&&a.length<=10&&digits(a,a.length)))return false;
+  const record=p.replay?data.history?.[game+'/'+p.issue]:data.games?.[game];
+  if(!record||record.issue!==p.issue||p.date!==record.date)return false;
+  if(!['positions','eightPositions'].every(k=>record[k]?.length===3&&record[k].every(x=>x.status==='ready'&&x.issue===p.issue)))return false;
+  if(p.replay&&!record.draw)return false;
+  if(!p.replay&&record.status!=='ready')return false;
+  if(p.overallStatus==='ready'&&![5,6,7,8].every(k=>digits(p.overallPools?.[k],k)))return false;
+  return Array.isArray(p.candidates)&&p.candidates.every(x=>/^\d{3}$/.test(x));
+}
+function renderPrepared(data){
+  const p=data.prepared?.[SINGLE_KILL_LOTTERY];
+  if(!validPrepared(p,data,SINGLE_KILL_LOTTERY,PREPARED_ENGINE))return false;
+  lastRun=null;cloudAutomaticReplay=null;
+  const levels=Object.fromEntries([5,6,7,8].map(k=>[k,p.positions.map(a=>a.slice(0,k))]));
+  renderPositionCopies('primaryPositionCopies',levels);
+  const pools=p.overallStatus==='ready'?p.overallPools:{};
+  for(const id of ['fixedOverallPools','overallPools']){
+    const el=document.getElementById(id);if(el){el.innerHTML=renderOverallSourcePools(pools);addOverallCopyButtons(el);}
+  }
+  const positionHtml=['百位','十位','个位'].map((name,i)=>'<div class="output-section"><h3>'+name+'</h3><div class="output-table">'+[5,6,7,8].map(k=>'<div class="output-cell"><strong>'+k+'码</strong><div class="output-code">'+p.positions[i].slice(0,k).sort((a,b)=>a-b).join(' ')+'</div></div>').join('')+'</div></div>').join('');
+  els.fixedPositionPools.innerHTML=positionHtml;
+  els.positionPools.innerHTML=positionHtml;
+  els.fixedDirectPicks.innerHTML=p.candidates.map(num=>'<span class="direct-code">'+num+'</span>').join('');
+  els.fixedIssue.textContent=(p.replay?'历史回放 ':'预测 ')+p.issue+' 期';
+  els.fixedModelNote.textContent='抓取时间：'+new Date(p.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})+(p.replay?'；历史重算，非当期预测':'')+(p.overallStatus==='ready'?'':'；综合池来源待更新');
+  if(p.replay){els.replayIssue.value=p.issue;els.replayDate.value=p.date;}
+  els.replayStatus.textContent=p.replay?'历史回放':'当期预测';
+  els.replaySummary.textContent=p.replay?'开奖：'+(p.draw?.result||'待核对')+'；当期数据尚未齐全。':'';
+  cloudRevision=data.checkedAt;
+  document.getElementById('expertNineStatus').textContent=(p.replay?'当期未齐，显示历史记录：':'已更新：')+p.issue+'；抓取 '+new Date(p.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
+  return true;
+}
 let cloudLoading = false;
 async function readCloudState() {
   for (let attempt=0;attempt<2;attempt++) {
@@ -5152,6 +5188,7 @@ async function syncCloudModel(manual = false) {
     }
     els.dataBox.value=rowsToCsv([...rows.values()].sort((a,b)=>Number(a.issue)-Number(b.issue)));
     refreshReplayOptions(parseCsv(els.dataBox.value));
+    if(renderPrepared(data))return;
     const records=Object.entries(data.history || {}).filter(([key,r])=>key.startsWith(SINGLE_KILL_LOTTERY+'/')&&r.draw&&['positions','eightPositions'].every(f=>r[f]?.length===3&&r[f].every(p=>p?.status==='ready'))).map(([,r])=>r).sort((a,b)=>Number(b.issue)-Number(a.issue));
     if(g.status!=='ready' && records.length) {
       const selected=records.find(r=>r.issue===els.replayIssue.value)||records[0];
@@ -5198,7 +5235,7 @@ renderPrimaryCopies();
       const restored = mergeDefaultHistory(readSavedData());
       els.dataBox.value = rowsToCsv(restored.rows);
       if (restored.conflicts.length) showStatus("已保留本地修改，请核对期号：" + restored.conflicts.join("、"), true);
-      else runModel();
+      else syncCloudModel();
     } catch (error) { showStatus("本地数据需核对：" + error.message, true); }
   </script>
 </body>
