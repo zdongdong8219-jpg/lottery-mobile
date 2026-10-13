@@ -4807,12 +4807,12 @@ function renderPrepared(data){
   els.positionPools.innerHTML=positionHtml;
   els.fixedDirectPicks.innerHTML=p.candidates.map(num=>'<span class="direct-code">'+num+'</span>').join('');
   els.fixedIssue.textContent=(p.replay?'历史回放 ':'预测 ')+p.issue+' 期';
-  els.fixedModelNote.textContent='抓取时间：'+new Date(p.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})+(p.replay?'；历史重算，非当期预测':'')+(p.overallStatus==='ready'?'':'；综合池来源待更新');
+  els.fixedModelNote.textContent='来源记录：'+(p.capturedAt?new Date(p.capturedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}):'时间待核对')+(p.replay?'；历史重算，非当期预测':'')+(p.overallStatus==='ready'?'':'；综合池来源待更新');
   if(p.replay){els.replayIssue.value=p.issue;els.replayDate.value=p.date;}
   els.replayStatus.textContent=p.replay?'历史回放':'当期预测';
   els.replaySummary.textContent=p.replay?'开奖：'+(p.draw?.result||'待核对')+'；当期数据尚未齐全。':'';
   cloudRevision=data.checkedAt;
-  document.getElementById('expertNineStatus').textContent=(p.replay?'当期未齐，显示历史记录：':'已更新：')+p.issue+'；抓取 '+new Date(p.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
+  document.getElementById('expertNineStatus').textContent=(p.replay?'当期未齐，显示历史记录：':'已更新：')+p.issue+'；云端检查 '+new Date(p.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
   return true;
 }
 let cloudLoading = false;
