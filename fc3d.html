@@ -4473,8 +4473,27 @@ function medianOverall(input) {
 if(typeof module!=='undefined')module.exports={medianOverall};
 
 'use strict';
+function applyFiveDanRepair(pools, rows) {
+  const rule='fc3d-five-dan-no-overlap-v1';
+  for(const k of [5,6,7,8])if(!Array.isArray(pools[k])||pools[k].length!==k||new Set(pools[k]).size!==k||pools[k].some(d=>!Number.isInteger(d)||d<0||d>9))throw Error('Invalid overall pool for five-digit repair');
+  const past=rows.slice(-5),counts=Array(10).fill(0);
+  if(past.length!==5)throw Error('Five preceding draws required');
+  for(const row of past){
+    if(!Array.isArray(row.digits)||row.digits.length!==3||row.digits.some(d=>!Number.isInteger(d)||d<0||d>9))throw Error('Invalid preceding draw');
+    for(const d of new Set(row.digits))counts[d]++;
+  }
+  const candidates=counts.flatMap((n,d)=>n===2?[d]:[]),original=pools[5].slice(),next=original.slice();
+  let added=null,removed=null;
+  if(!next.some(d=>candidates.includes(d))){
+    const rank=[...new Set([5,6,7,8].flatMap(k=>pools[k]))];
+    const add=rank.find(d=>!next.includes(d)&&candidates.includes(d));
+    const remove=next.filter(d=>!candidates.includes(d)).sort((a,b)=>rank.indexOf(b)-rank.indexOf(a))[0];
+    if(add!==undefined&&remove!==undefined){next[next.indexOf(remove)]=add;added=add;removed=remove;}
+  }
+  return {pools:{...pools,5:next},fiveDanRepair:{rule,candidates,original,added,removed,triggered:added!==null,nestedInSix:next.every(d=>pools[6].includes(d)),sourceIssues:past.map(r=>r.issue)}};
+}
 function createMedianOverallLink(base, snapshot, archive, reference, specs, makeCore) {
-  const version='overall-median-20261008-v1', sizes=[5,6,7,8];
+  const version='overall-median-five-dan-20261013-v2', sizes=[5,6,7,8];
   let revision, cores={}, cache=new Map();
   function record(issue) {
     const g=snapshot.games?.fc3d;
@@ -4522,7 +4541,8 @@ function createMedianOverallLink(base, snapshot, archive, reference, specs, make
           ranks[size]=cores[size].PlanA.predict(rows,'fc3d').overall;
         }
       }
-      result={version,status:'ready',issue,pools:medianOverall({sets,ranks}),sourceSizes:[4,5,8],historicalReconstruction:!!archive[issue]};
+      const repaired=applyFiveDanRepair(medianOverall({sets,ranks}),rows);
+      result={version,status:'ready',issue,...repaired,sourceSizes:[4,5,8],historicalReconstruction:!!archive[issue]};
     } catch(error) {result={version,status:'pending',issue,pools:{},reason:error.message};}
     cache.set(key,result);
     return result;
@@ -5099,7 +5119,7 @@ async function readFastState(options={},fetcher=fetch,timeoutMs=5000){
   if(!valid.length)throw Error('云端两条数据通道均不可用，请稍后刷新');
   return {ok:true,json:async()=>valid[0].data};
 }
-const PREPARED_ENGINE="01ea284ce378e2ccab237c20976ab10e5c48fe10eede067799f7cec37bd23374";
+const PREPARED_ENGINE="c2213bcfa09d4cd8f63993c2894e75b1b75bb75bdc0178260840751212c2446f";
 function validPrepared(p,data,game,engine){
   const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
   if(!p||p.engine!==engine||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
