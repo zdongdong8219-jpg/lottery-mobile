@@ -5093,7 +5093,7 @@ function addOverallCopyButtons(root){
  });
 }
 
-const PREPARED_ENGINE="cad1fb01390085208a8c3d092261e35de4bf57d2ab048b04a68dc5595772e9dc";
+const PREPARED_ENGINE="12c48ac22f3e8245403ca914ec5486e6a765f78105a3075e630bbd35033df594";
 function validPrepared(p,data,game,engine){
   const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
   if(!p||p.engine!==engine||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
@@ -5217,7 +5217,15 @@ async function syncCloudModel(manual = false) {
 }
 els.btnRefreshExperts.removeEventListener('click',runModel);
 els.btnRefreshExperts.addEventListener('click',()=>syncCloudModel(true));
-syncCloudModel();
+async function startCloudSync() {
+  // Let the page restore its local history first. Starting cloud replay while
+  // the initial model calculation is busy makes runReplay return without
+  // rendering, leaving an old pending screen visible on mobile.
+  await new Promise(resolve=>setTimeout(resolve,0));
+  while(busy) await new Promise(resolve=>setTimeout(resolve,50));
+  await syncCloudModel();
+}
+startCloudSync();
 let cloudLastPoll=0;
 setInterval(()=>{
   if(document.hidden)return;
