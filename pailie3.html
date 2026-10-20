@@ -4753,7 +4753,7 @@ function addOverallCopyButtons(root){
  });
 }
 
-const PREPARED_ENGINE="3d5128c4faf7ebecd937f31c5e305b2b359473e11146ec25632a63b789ebf219";
+const PREPARED_ENGINE="516e873d31a4854343e1724b8fd10ad275fd436589ba11e77d991b2c396d1bf6";
 function validPrepared(p,data,game,engine){
   const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
   if(!p||p.engine!==engine||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
@@ -4904,7 +4904,7 @@ renderPrimaryCopies();
       const restored = mergeDefaultHistory(readSavedData());
       els.dataBox.value = rowsToCsv(restored.rows);
       if (restored.conflicts.length) els.saveNote.textContent = "已保留本地修改，请核对期号：" + restored.conflicts.join("、");
-      else syncCloudModel();
+      else refreshReplayOptions(restored.rows);
     } catch (error) { els.saveNote.textContent = "本地数据需核对：" + error.message; }
   </script>
 </body>
