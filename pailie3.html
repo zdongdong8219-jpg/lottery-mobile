@@ -4753,7 +4753,7 @@ function addOverallCopyButtons(root){
  });
 }
 
-const PREPARED_ENGINE="516e873d31a4854343e1724b8fd10ad275fd436589ba11e77d991b2c396d1bf6";
+const PREPARED_ENGINE="1fc346935db51098cc5670034e6f447f474b28e2b4a3d8a82938b141fbc8588b";
 function validPrepared(p,data,game,engine){
   const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
   if(!p||p.engine!==engine||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
@@ -4822,6 +4822,33 @@ async function readCloudState() {
 }
 let cloudRevision = '';
 let cloudAutomaticReplay = null;
+function renderCloudPrepared(data) {
+  const p=data.prepared?.[SINGLE_KILL_LOTTERY];
+  const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
+  if(!p||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
+  if(!Array.isArray(p.positions)||p.positions.length!==3||!p.positions.every(a=>Array.isArray(a)&&a.length>=8&&a.length<=10&&digits(a,a.length)))return false;
+  const record=p.replay?data.history?.[SINGLE_KILL_LOTTERY+'/'+p.issue]:data.games?.[SINGLE_KILL_LOTTERY];
+  if(!record||record.issue!==p.issue||record.date!==p.date)return false;
+  if(!['positions','eightPositions'].every(k=>record[k]?.length===3&&record[k].every(x=>x.status==='ready'&&x.issue===p.issue)))return false;
+  if(p.replay&&!record.draw)return false;
+  if(!p.replay&&record.status!=='ready')return false;
+  if(p.overallStatus==='ready'&&![5,6,7,8].every(k=>digits(p.overallPools?.[k],k)))return false;
+  lastRun=null;cloudAutomaticReplay=null;
+  const levels=Object.fromEntries([5,6,7,8].map(k=>[k,p.positions.map(a=>a.slice(0,k))]));
+  renderPositionCopies('primaryPositionCopies',levels);
+  const positionHtml=['百位','十位','个位'].map((name,i)=>'<div class="output-section"><h3>'+name+'</h3><div class="output-table">'+[5,6,7,8].map(k=>'<div class="output-cell"><strong>'+k+'码</strong><div class="output-code">'+p.positions[i].slice(0,k).sort((a,b)=>a-b).join(' ')+'</div></div>').join('')+'</div></div>').join('');
+  els.fixedPositionPools.innerHTML=positionHtml;els.positionPools.innerHTML=positionHtml;
+  const pools=p.overallStatus==='ready'?p.overallPools:{};
+  for(const id of ['fixedOverallPools','overallPools']){const el=document.getElementById(id);if(el){el.innerHTML=renderOverallSourcePools(pools);addOverallCopyButtons(el);}}
+  els.fixedDirectPicks.innerHTML=(p.candidates||[]).map(num=>'<span class="direct-code">'+num+'</span>').join('');
+  els.fixedIssue.textContent=(p.replay?'回放预测 ':'预测 ')+p.issue;
+  els.fixedModelNote.textContent='来源记录：'+(p.capturedAt?new Date(p.capturedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}):'时间待核对')+(p.replay?'；历史回放':'')+(p.overallStatus==='ready'?'':'；综合池来源待更新');
+  if(p.replay){els.replayIssue.value=p.issue;els.replayDate.value=p.date;}
+  els.replayStatus.textContent=p.replay?'已完成':'当期预测';
+  els.replaySummary.textContent=p.replay?'回放 '+p.issue+'（'+p.date+'）：实际开奖：'+(p.draw?.result||record.draw?.result||'待核对')+'。云端预先计算结果已载入。':'';
+  cloudRevision=data.checkedAt;
+  return true;
+}
 async function syncCloudModel(manual = false) {
   if (cloudLoading || busy || (lastRun?.replay && lastRun !== cloudAutomaticReplay && !manual)) return;
   cloudLoading = true;
@@ -4852,6 +4879,10 @@ async function syncCloudModel(manual = false) {
     els.dataBox.value=rowsToCsv([...rows.values()].sort((a,b)=>Number(a.issue)-Number(b.issue)));
     refreshReplayOptions(parseCsv(els.dataBox.value));
     if(renderPrepared(data))return;
+    if(renderCloudPrepared(data)){
+      if(status)status.textContent=(data.prepared[SINGLE_KILL_LOTTERY].replay?'当期未齐，显示历史记录：':'已更新：')+data.prepared[SINGLE_KILL_LOTTERY].issue+'；云端检查 '+new Date(data.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
+      return;
+    }
     const records=Object.entries(data.history || {}).filter(([key,r])=>key.startsWith(SINGLE_KILL_LOTTERY+'/')&&r.draw&&['positions','eightPositions'].every(f=>r[f]?.length===3&&r[f].every(p=>p?.status==='ready'))).map(([,r])=>r).sort((a,b)=>Number(b.issue)-Number(a.issue));
     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const latestDrawIssue=(g.draws||[]).at(-1)?.issue||'';
