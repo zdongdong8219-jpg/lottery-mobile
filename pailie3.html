@@ -4574,7 +4574,7 @@ renderPrimaryCopies();
       const sizes = [5, 6, 7, 8];
       const positionHits = sizes.map(size => ranks.map((ranked, position) => ranked.slice(0, size).some(item => item.digit === target.digits[position])));
       const overallHits = sizes.map(size => target.digits.every(digit => overall.slice(0, size).some(item => item.digit === digit)));
-      return `${positionHits.map((hits, index) => `${sizes[index]}码定位 ${hits.filter(Boolean).length}/3`).join('；')}。${overallHits.map((hit, index) => `${sizes[index]}码综合池 ${hit ? '全包' : '未全包'}`).join('；')}。这是历史重算，实际号码只用于对照；补抓专家数据不代表开奖前已保存。`;
+      return `实际开奖：${target.result}。${positionHits.map((hits, index) => `${sizes[index]}码定位 ${hits.filter(Boolean).length}/3`).join('；')}。${overallHits.map((hit, index) => `${sizes[index]}码综合池 ${hit ? '全包' : '未全包'}`).join('；')}。这是历史重算，实际号码只用于对照；补抓专家数据不代表开奖前已保存。`;
     }
 
     function setBusy(value) {
@@ -4753,7 +4753,7 @@ function addOverallCopyButtons(root){
  });
 }
 
-const PREPARED_ENGINE="3693ddfedb40d54a5aa9db68f03d24b007959774e1540172d471f112cdb6a3df";
+const PREPARED_ENGINE="3d5128c4faf7ebecd937f31c5e305b2b359473e11146ec25632a63b789ebf219";
 function validPrepared(p,data,game,engine){
   const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
   if(!p||p.engine!==engine||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
