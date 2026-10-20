@@ -4753,7 +4753,7 @@ function addOverallCopyButtons(root){
  });
 }
 
-const PREPARED_ENGINE="1687883d0d1905f6137a5c0f44f01e94522111955710301bb08919a19254ea3c";
+const PREPARED_ENGINE="6f01c23cb0cfb4bab8fdd88626a3203e1ad77cc42717591de1d6ae4f459afdce";
 function validPrepared(p,data,game,engine){
   const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
   if(!p||p.engine!==engine||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
@@ -4857,7 +4857,7 @@ async function syncCloudModel(manual = false) {
     const latestDrawIssue=(g.draws||[]).at(-1)?.issue||'';
     const openPrediction=g.status==='ready'&&data.date===g.date&&String(g.issue||'')>String(latestDrawIssue);
     if(!openPrediction && records.length) {
-      const selected=records.find(r=>r.issue===els.replayIssue.value)||records[0];
+      const selected=records[0];
       els.replayIssue.value=selected.issue;els.replayDate.value=selected.date;
       await runReplay();
       if(els.replayStatus.textContent==='失败')throw Error(els.replaySummary.textContent);
