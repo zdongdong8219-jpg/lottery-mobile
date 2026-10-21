@@ -5093,7 +5093,7 @@ function addOverallCopyButtons(root){
  });
 }
 
-const PREPARED_ENGINE="1353dd4f095038a2788983cc3659100fbc19aa586d3668049080ead00adef173";
+const PREPARED_ENGINE="4a55a564da31d85e5ad293b2eaf8cef6b5823a93c7b864da706deedbd6c833da";
 function validPrepared(p,data,game,engine){
   const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
   if(!p||p.engine!==engine||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
@@ -5204,6 +5204,15 @@ async function syncCloudModel(manual = false) {
     Object.assign(EXPERT_NINE_SNAPSHOT, data);
     renderPrimaryCopies();
     const g = data.games[SINGLE_KILL_LOTTERY];
+    // The prepared result is already complete and validated against the cloud
+    // record. Render it before rebuilding the large local history/replay list.
+    // On mobile, doing the history merge first makes FC3D appear blank or
+    // "calculating" again after a swipe/page restore.
+    if(renderPrepared(data))return;
+    if(renderCloudPrepared(data)){
+      if(status)status.textContent=(data.prepared[SINGLE_KILL_LOTTERY].replay?'当期未齐，显示历史记录：':'已更新：')+data.prepared[SINGLE_KILL_LOTTERY].issue+'；云端检查 '+new Date(data.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
+      return;
+    }
     const rows = new Map(parseCsv(els.dataBox.value).map(r=>[r.issue,r]));
     for(const r of g.draws || []) {
       if (!/^20\d{5}$/.test(r.issue) || !/^\d{3}$/.test(r.result)) throw Error('云端开奖格式无效');
@@ -5218,11 +5227,6 @@ async function syncCloudModel(manual = false) {
     }
     els.dataBox.value=rowsToCsv([...rows.values()].sort((a,b)=>Number(a.issue)-Number(b.issue)));
     refreshReplayOptions(parseCsv(els.dataBox.value));
-    if(renderPrepared(data))return;
-    if(renderCloudPrepared(data)){
-      if(status)status.textContent=(data.prepared[SINGLE_KILL_LOTTERY].replay?'当期未齐，显示历史记录：':'已更新：')+data.prepared[SINGLE_KILL_LOTTERY].issue+'；云端检查 '+new Date(data.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
-      return;
-    }
     const records=Object.entries(data.history || {}).filter(([key,r])=>key.startsWith(SINGLE_KILL_LOTTERY+'/')&&r.draw&&['positions','eightPositions'].every(f=>r[f]?.length===3&&r[f].every(p=>p?.status==='ready'))).map(([,r])=>r).sort((a,b)=>Number(b.issue)-Number(a.issue));
     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const latestDrawIssue=(g.draws||[]).at(-1)?.issue||'';
@@ -5234,9 +5238,11 @@ async function syncCloudModel(manual = false) {
       if(els.replayStatus.textContent==='失败')throw Error(els.replaySummary.textContent);
       cloudAutomaticReplay=lastRun;
     } else {
-      const calculated=await runModel();
-      if(calculated!==true)throw Error('本期计算未成功，请核对专家名单、期号或数据状态');
-      cloudAutomaticReplay=null;
+      // Automatic cloud refresh must never launch the full on-device model.
+      // That calculation is expensive on FC3D and can be retriggered by a
+      // mobile page restore. Cloud publishing supplies prepared results; if
+      // one is temporarily unavailable, retain the last visible result.
+      throw Error('云端成品结果暂未生成，已保留当前显示；请稍后刷新');
     }
     cloudRevision = data.checkedAt;
     renderPrimaryCopies();
