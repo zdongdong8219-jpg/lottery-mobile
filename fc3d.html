@@ -5093,7 +5093,8 @@ function addOverallCopyButtons(root){
  });
 }
 
-const PREPARED_ENGINE="4a55a564da31d85e5ad293b2eaf8cef6b5823a93c7b864da706deedbd6c833da";
+const PREPARED_ENGINE="fe9842efe9b6ec5b15edf1f1ae7df3730408ce23e3d9075f2d96379aeeea8d48";
+const CLOUD_DISPLAY_ONLY=true;
 function validPrepared(p,data,game,engine){
   const digits=(a,n)=>Array.isArray(a)&&a.length===n&&new Set(a).size===n&&a.every(d=>Number.isInteger(d)&&d>=0&&d<=9);
   if(!p||p.engine!==engine||p.checkedAt!==data.checkedAt||!/^20\d{5}$/.test(p.issue))return false;
@@ -5213,6 +5214,11 @@ async function syncCloudModel(manual = false) {
       if(status)status.textContent=(data.prepared[SINGLE_KILL_LOTTERY].replay?'当期未齐，显示历史记录：':'已更新：')+data.prepared[SINGLE_KILL_LOTTERY].issue+'；云端检查 '+new Date(data.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
       return;
     }
+    // Production mobile pages are display-only. If the cloud prepared result
+    // is not ready, keep the last visible result and poll again; never rebuild
+    // a forecast or historical replay on the phone.
+    if(typeof CLOUD_DISPLAY_ONLY!=='undefined'&&CLOUD_DISPLAY_ONLY)
+      throw Error('云端成品结果暂未生成，已保留当前显示；页面会自动重试');
     const rows = new Map(parseCsv(els.dataBox.value).map(r=>[r.issue,r]));
     for(const r of g.draws || []) {
       if (!/^20\d{5}$/.test(r.issue) || !/^\d{3}$/.test(r.result)) throw Error('云端开奖格式无效');
