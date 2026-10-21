@@ -4780,13 +4780,13 @@ function renderPrepared(data){
   els.fixedPositionPools.innerHTML=positionHtml;
   els.positionPools.innerHTML=positionHtml;
   els.fixedDirectPicks.innerHTML=p.candidates.map(num=>'<span class="direct-code">'+num+'</span>').join('');
-  els.fixedIssue.textContent=(p.replay?'历史回放 ':'预测 ')+p.issue+' 期';
-  els.fixedModelNote.textContent='来源记录：'+(p.capturedAt?new Date(p.capturedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}):'时间待核对')+(p.replay?'；历史重算，非当期预测':'')+(p.overallStatus==='ready'?'':'；综合池来源待更新');
+  els.fixedIssue.textContent=(p.replay?'最近完整结果 ':'预测 ')+p.issue+' 期';
+  els.fixedModelNote.textContent=(p.replay?'今日资料晚上21:01后发布；当前完整显示昨天结果。':'')+'来源记录：'+(p.capturedAt?new Date(p.capturedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}):'时间待核对')+(p.replay?'；开奖后复盘，非今天预测':'')+(p.overallStatus==='ready'?'':'；综合池来源待更新');
   if(p.replay){els.replayIssue.value=p.issue;els.replayDate.value=p.date;}
-  els.replayStatus.textContent=p.replay?'历史回放':'当期预测';
-  els.replaySummary.textContent=p.replay?'开奖：'+(p.draw?.result||'待核对')+'；当期数据尚未齐全。':'';
+  els.replayStatus.textContent=p.replay?'昨天结果已完整显示':'当期预测';
+  els.replaySummary.textContent=p.replay?'昨天 '+p.issue+' 期已完整：开奖 '+(p.draw?.result||'待核对')+'。今天 '+data.games?.[SINGLE_KILL_LOTTERY]?.issue+' 期将在晚上21:01后更新。':'';
   cloudRevision=data.checkedAt;
-  document.getElementById('expertNineStatus').textContent=(p.replay?'当期未齐，显示历史记录：':'已更新：')+p.issue+'；云端检查 '+new Date(p.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
+  document.getElementById('expertNineStatus').textContent=(p.replay?'今天待发布；昨天完整结果已显示：':'已更新：')+p.issue+'；云端检查 '+new Date(p.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
   return true;
 }
 let cloudLoading = false;
