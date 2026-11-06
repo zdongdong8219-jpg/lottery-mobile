@@ -864,7 +864,7 @@ function resultMarkup(data,game,engine){
   for(const k of [5,6,7,8])html+=button('复制'+k+'码定位',lotteryPrefix+' '+k+'码复式定位\n'+names.map((n,i)=>n+' '+digits(p.positions[i].slice(0,k))).join('\n'));
   return html+'</div></div><div class="output-section"><h3>A方案直选候选</h3><div id="fixedDirectPicks">'+p.candidates.join(' ')+'</div></div>';
 }
-(function phoneClient(state,game,engine){
+(function phoneClient(state,game,engine,endpoints){
   let revision='',loading=false,lockedIssue='',lockedSignature='';
   const output=document.getElementById('phoneResults'),status=document.getElementById('syncStatus');
   const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -878,9 +878,9 @@ function resultMarkup(data,game,engine){
   async function refresh(){
     if(loading)return;loading=true;
     try{
-      const urls=['./results-state.json','https://raw.githubusercontent.com/zdongdong8219-jpg/lottery-mobile/main/results-state.json'];
+      const urls=endpoints||['./results-state.json','https://raw.githubusercontent.com/zdongdong8219-jpg/lottery-mobile/main/results-state.json'];
       const requests=urls.map(async url=>{
-        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);
+        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),endpoints?30000:5000);
         try{
           const r=await fetch(url+'?t='+Date.now(),{cache:'no-store',signal:controller.signal});
           if(!r.ok)throw Error('HTTP '+r.status);
@@ -894,7 +894,14 @@ function resultMarkup(data,game,engine){
       if(!healthy.length)throw Error('No healthy result channel');
       healthy.sort((a,b)=>Date.parse(b.checkedAt)-Date.parse(a.checkedAt));
       const next=healthy[0],p=next.prepared?.[game],sig=signature(next);
-      if(!p||p.date!==today()||next.games[game]?.issue!==p.issue){waiting('今天结果尚未确认，旧期号码已隐藏。');status.textContent='等待今天云端结果';return;}
+      if(!p||p.date!==today()||next.games[game]?.issue!==p.issue){
+        const g=next.games[game];
+        if(g?.date===today()&&g.eightPositions?.length===3&&g.eightPositions.every(x=>x.status==='ready'&&x.issue===g.issue)){
+          output.innerHTML=resultMarkup({...next,prepared:{}},game,engine);
+          status.textContent='本期8码已到，其他结果待齐';
+        }else{waiting('今天结果尚未确认，旧期号码已隐藏。');status.textContent='等待今天云端结果';}
+        return;
+      }
       const sameRevision=healthy.filter(x=>x.checkedAt===next.checkedAt&&x.prepared?.[game]?.issue===p.issue);
       if(sameRevision.some(x=>signature(x)!==sig)){waiting('检测到云端同一期存在两套结果，已停止显示和复制。');status.textContent='结果冲突，等待云端修复';return;}
       const saved=localStorage.getItem('ft-result-lock-'+game+'-'+p.issue);
@@ -916,4 +923,4 @@ function resultMarkup(data,game,engine){
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
   setInterval(()=>{if(!document.hidden)refresh();},15000);
   refresh();
-})({"date":"2026-11-04","checkedAt":"2026-11-04T13:06:54.693Z","prepared":{"fc3d":{"engine":"64aac38c4daba84dbaac9af2630831c5909fe573bbbacf72513f941a1cb10bbe","checkedAt":"2026-11-04T13:06:54.693Z","capturedAt":"2026-11-04T13:06:54.693Z","issue":"2026294","date":"2026-11-04","replay":false,"historicalSimulation":false,"draw":null,"positions":[[9,6,0,5,3,1,8,7,2],[2,6,1,4,3,7,8,0,5],[2,5,4,7,0,8,3,9,1]],"overallPools":{"5":[2,0,1,4,5],"6":[2,0,1,4,3,6],"7":[2,0,1,4,3,6,5],"8":[2,6,9,3,4,1,0,5]},"overallStatus":"ready","overallVersion":"overall-median-five-dan-20261013-v2","fiveDanRepair":{"rule":"fc3d-five-dan-no-overlap-v1","candidates":[5],"original":[2,0,1,4,3],"added":5,"removed":3,"triggered":true,"nestedInSix":false,"sourceIssues":["2026289","2026290","2026291","2026292","2026293"]},"candidates":["555","631","654","954","993","435","397","346","023","612"]}},"games":{"fc3d":{"issue":"2026294","date":"2026-11-04","status":"ready","positions":[{"status":"ready","issue":"2026294","name":"明月清风","reason":null},{"status":"ready","issue":"2026294","name":"放逐","reason":null},{"status":"ready","issue":"2026294","name":"十里承欢","reason":null}],"eightPositions":[{"status":"ready","issue":"2026294","name":"夹谷帅雄","numbers":[0,1,3,5,6,7,8,9]},{"status":"ready","issue":"2026294","name":"泰生声","numbers":[0,1,2,3,4,6,7,8]},{"status":"ready","issue":"2026294","name":"二猪","numbers":[0,2,3,4,5,7,8,9]}]},"pailie3":{"issue":"2026294","date":"2026-11-04","status":"ready","positions":[{"status":"ready","issue":"2026294","name":"三横一竖","reason":null},{"status":"ready","issue":"2026294","name":"Achilleus","reason":null},{"status":"ready","issue":"2026294","name":"後街男孩成年","reason":null}],"eightPositions":[{"status":"ready","issue":"2026294","name":"十哥","numbers":[1,2,3,4,5,6,7,8]},{"status":"ready","issue":"2026294","name":"遇向波","numbers":[0,2,3,4,6,7,8,9]},{"status":"ready","issue":"2026294","name":"答二","numbers":[1,2,3,5,6,7,8,9]}]}},"history":{}},"fc3d","64aac38c4daba84dbaac9af2630831c5909fe573bbbacf72513f941a1cb10bbe");</script></body></html>
+})({"date":"2026-11-04","checkedAt":"2026-11-04T13:06:54.693Z","prepared":{"fc3d":{"engine":"64aac38c4daba84dbaac9af2630831c5909fe573bbbacf72513f941a1cb10bbe","checkedAt":"2026-11-04T13:06:54.693Z","capturedAt":"2026-11-04T13:06:54.693Z","issue":"2026294","date":"2026-11-04","replay":false,"historicalSimulation":false,"draw":null,"positions":[[9,6,0,5,3,1,8,7,2],[2,6,1,4,3,7,8,0,5],[2,5,4,7,0,8,3,9,1]],"overallPools":{"5":[2,0,1,4,5],"6":[2,0,1,4,3,6],"7":[2,0,1,4,3,6,5],"8":[2,6,9,3,4,1,0,5]},"overallStatus":"ready","overallVersion":"overall-median-five-dan-20261013-v2","fiveDanRepair":{"rule":"fc3d-five-dan-no-overlap-v1","candidates":[5],"original":[2,0,1,4,3],"added":5,"removed":3,"triggered":true,"nestedInSix":false,"sourceIssues":["2026289","2026290","2026291","2026292","2026293"]},"candidates":["555","631","654","954","993","435","397","346","023","612"]}},"games":{"fc3d":{"issue":"2026294","date":"2026-11-04","status":"ready","positions":[{"status":"ready","issue":"2026294","name":"明月清风","reason":null},{"status":"ready","issue":"2026294","name":"放逐","reason":null},{"status":"ready","issue":"2026294","name":"十里承欢","reason":null}],"eightPositions":[{"status":"ready","issue":"2026294","name":"夹谷帅雄","numbers":[0,1,3,5,6,7,8,9]},{"status":"ready","issue":"2026294","name":"泰生声","numbers":[0,1,2,3,4,6,7,8]},{"status":"ready","issue":"2026294","name":"二猪","numbers":[0,2,3,4,5,7,8,9]}]},"pailie3":{"issue":"2026294","date":"2026-11-04","status":"ready","positions":[{"status":"ready","issue":"2026294","name":"三横一竖","reason":null},{"status":"ready","issue":"2026294","name":"Achilleus","reason":null},{"status":"ready","issue":"2026294","name":"後街男孩成年","reason":null}],"eightPositions":[{"status":"ready","issue":"2026294","name":"十哥","numbers":[1,2,3,4,5,6,7,8]},{"status":"ready","issue":"2026294","name":"遇向波","numbers":[0,2,3,4,6,7,8,9]},{"status":"ready","issue":"2026294","name":"答二","numbers":[1,2,3,5,6,7,8,9]}]}},"history":{}},"fc3d","64aac38c4daba84dbaac9af2630831c5909fe573bbbacf72513f941a1cb10bbe",null);</script></body></html>
