@@ -824,9 +824,11 @@ function resultMarkup(data,game,engine){
   const ready=validPrepared(p,data,game,engine);
   const currentEightReady=g&&g.eightPositions?.length===3&&g.eightPositions.every(x=>x.status==='ready'&&x.issue===g.issue&&Array.isArray(x.numbers)&&x.numbers.length===8&&x.numbers.every(d=>Number.isInteger(d)&&d>=0&&d<=9));
   const showingOlderComplete=ready&&g&&g.issue!==p.issue;
-  const button=(text,value)=>'<button class="btn" data-copy="'+esc(value)+'">'+text+'</button>';
+  const button=(text,value)=>data.historyView?'':'<button class="btn" data-copy="'+esc(value)+'">'+text+'</button>';
   let html='<div class="help" id="deliveryStatus">';
-  if(g&&(!ready||g.issue!==p.issue||g.status!=='ready')){
+  if(data.historyView){
+    html+='今天结果尚未发布。以下是最近完整历史记录，仅供查看，不能作为今天号码；今日完整结果到达后自动更新。';
+  }else if(g&&(!ready||g.issue!==p.issue||g.status!=='ready')){
     html+=esc(g.date)+' · '+esc(g.issue)+'期未完整采集。';
     const missing=(g.positions||[]).map((x,i)=>({x,i})).filter(({x})=>x.status!=='ready');
     html+=missing.map(({i})=>esc(names[i]||'定位')+'：资料待齐').join('；');
@@ -841,7 +843,7 @@ function resultMarkup(data,game,engine){
     html+='</div>';
   }
   if(!ready)return html;
-  html+='<div class="panel-head"><h2 id="fixedIssue">'+(p.historicalSimulation?'历史模拟 ':(p.replay?(showingOlderComplete?'上一期完整结果 ':'最近完整结果 '):'预测 '))+esc(p.issue)+' 期</h2></div>';
+  html+='<div class="panel-head"><h2 id="fixedIssue">'+(data.historyView?'历史留存 ':p.historicalSimulation?'历史模拟 ':(p.replay?(showingOlderComplete?'上一期完整结果 ':'最近完整结果 '):'预测 '))+esc(p.issue)+' 期</h2></div>';
   html+='<div class="panel-note" id="fixedModelNote">'+esc(p.date)+(p.historicalSimulation?'；按当前模型补算，非当晚实时采集':(p.replay?'；历史结果，非当前期预测':''))+'；来源记录：'+esc(p.capturedAt?new Date(p.capturedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}):'待核对')+'</div>';
   html+='<div class="output-section"><h3>综合号码池</h3><div class="output-table" id="fixedOverallPools">';
   if(p.overallStatus==='ready')for(const k of [5,6,7,8])html+='<div class="output-cell"><strong>'+k+'码</strong><div class="output-code">'+digits(p.overallPools[k])+'</div>'+button('复制'+k+'码',lotteryPrefix+' 组6\n'+digits(p.overallPools[k]))+'</div>';
@@ -887,6 +889,16 @@ function resultMarkup(data,game,engine){
         if(g?.date===today()&&g.eightPositions?.length===3&&g.eightPositions.every(x=>x.status==='ready'&&x.issue===g.issue)){
           output.innerHTML=resultMarkup({...next,prepared:{}},game,engine);
           status.textContent='本期8码已到，其他结果待齐';
+        }else if(p&&p.date<today()){
+          const peers=healthy.filter(x=>x.checkedAt===next.checkedAt&&x.prepared?.[game]?.issue===p.issue);
+          const saved=localStorage.getItem('ft-result-lock-'+game+'-'+p.issue);
+          if(peers.some(x=>signature(x)!==sig)||(saved&&saved!==sig)){
+            waiting('历史记录存在同一期结果冲突，已停止显示。');status.textContent='结果冲突，等待云端核验';return;
+          }
+          output.innerHTML=resultMarkup({...next,historyView:true},game,engine);
+          status.textContent='当前显示历史：'+p.date+' · '+p.issue+'期；今天待更新';
+          localStorage.setItem('ft-result-lock-'+game+'-'+p.issue,sig);
+          lockedIssue=p.issue;lockedSignature=sig;revision=next.checkedAt;
         }else{waiting('今天结果尚未确认，旧期号码已隐藏。');status.textContent='等待今天云端结果';}
         return;
       }
