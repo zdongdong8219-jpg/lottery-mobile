@@ -836,7 +836,9 @@ function resultMarkup(data,game,engine){
   const ready=validPrepared(p,data,game,engine);
   const currentEightReady=g&&g.eightPositions?.length===3&&g.eightPositions.every(x=>x.status==='ready'&&x.issue===g.issue&&Array.isArray(x.numbers)&&x.numbers.length===8&&x.numbers.every(d=>Number.isInteger(d)&&d>=0&&d<=9));
   const showingOlderComplete=ready&&g&&g.issue!==p.issue;
-  const button=(text,value)=>data.historyView?'':'<button class="btn" data-copy="'+esc(value)+'">'+text+'</button>';
+  // A reconstructed record is explicitly labelled on screen, but remains
+  // copyable for audit. Ordinary stale records stay non-copyable.
+  const button=(text,value)=>data.historyView&&!p?.historicalSimulation?'':'<button class="btn" data-copy="'+esc(value)+'">'+(p?.historicalSimulation?'复制历史'+text.slice(2):text)+'</button>';
   let html='<div class="help" id="deliveryStatus">';
   if(data.historyView){
     html+='今天结果尚未发布。以下是最近完整历史记录，仅供查看，不能作为今天号码；今日完整结果到达后自动更新。';
